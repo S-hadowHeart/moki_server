@@ -1,44 +1,40 @@
 const express = require("express");
 const http = require("http");
-const socketIO = require("socket.io");
 const cors = require("cors");
+const { Server } = require("socket.io");
 
 const app = express();
+app.use(cors());
+
 const server = http.createServer(app);
-const io = socketIO(server, {
+
+const io = new Server(server, {
   cors: {
     origin: "*",
+    methods: ["GET", "POST"]
   }
 });
 
-let onlineUsers = new Map();
+let onlineUsers = new Set();
 
 io.on("connection", (socket) => {
-  console.log("New client connected:", socket.id);
+  console.log("User connected:", socket.id);
+  onlineUsers.add(socket.id);
 
-  socket.on("register", (username) => {
-    onlineUsers.set(socket.id, username);
-    console.log(`${username} connected. Total online: ${onlineUsers.size}`);
-    io.emit("onlineCount", onlineUsers.size);
-  });
+  io.emit("userCount", onlineUsers.size);
 
-  socket.on("broadcastMessage", ({ username, message }) => {
-    io.emit("receiveMessage", { username, message });
+  socket.on("broadcast", ({ username, message }) => {
+    io.emit("receive", { username, message });
   });
 
   socket.on("disconnect", () => {
-    const username = onlineUsers.get(socket.id);
+    console.log("User disconnected:", socket.id);
     onlineUsers.delete(socket.id);
-    console.log(`${username} disconnected. Total online: ${onlineUsers.size}`);
-    io.emit("onlineCount", onlineUsers.size);
+    io.emit("userCount", onlineUsers.size);
   });
-});
-
-app.get("/", (req, res) => {
-  res.send("TTS Broadcast Server Running!");
 });
 
 const PORT = process.env.PORT || 10000;
 server.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
